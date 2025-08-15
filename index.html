@@ -95,7 +95,7 @@
             z-index: 20;
             opacity: 0;
             pointer-events: none;
-            transition: opacity 0.5s ease-in-out;
+            transition: opacity 0.5s ease-in-out, width 0.3s, height 0.3s;
         }
         #radial-menu.visible {
             opacity: 1;
@@ -112,7 +112,7 @@
             font-size: 1.25rem; /* Letras más grandes */
             font-weight: 500;
             filter: blur(1.5px); /* Pequeño blur por defecto */
-            transition: filter 0.3s, transform 0.3s;
+            transition: filter 0.3s, transform 0.3s, font-size 0.3s;
         }
         /* Estilo para la opción central */
         .menu-item-center {
@@ -123,6 +123,7 @@
             color: rgba(255, 255, 255, 0.7);
             font-size: 1.25rem;
             font-weight: 500;
+            transition: font-size 0.3s;
         }
 
         /* Texto de la pregunta */
@@ -147,6 +148,24 @@
         }
         #question-display.blurred {
             filter: blur(4px);
+        }
+
+        /* Texto de instrucción inicial */
+        #initial-instruction {
+            position: absolute;
+            bottom: 10%;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 5;
+            color: rgba(255, 255, 255, 0.8);
+            font-size: 1rem;
+            text-shadow: 1px 1px 4px rgba(0,0,0,0.5);
+            opacity: 0;
+            transition: opacity 1s ease-in-out;
+            pointer-events: none;
+        }
+        #initial-instruction.visible {
+            opacity: 1;
         }
 
         /* Advertencia de orientación */
@@ -182,6 +201,20 @@
         .hidden {
             display: none !important;
         }
+
+        /* Estilos para móvil en horizontal */
+        @media (orientation: landscape) and (max-height: 500px) {
+            #radial-menu {
+                width: 320px;
+                height: 320px;
+            }
+            .menu-item {
+                font-size: 1rem;
+            }
+            .menu-item-center {
+                font-size: 1rem;
+            }
+        }
     </style>
 </head>
 <body class="bg-black">
@@ -201,6 +234,9 @@
 
         <!-- Display de la pregunta -->
         <div id="question-display"></div>
+        
+        <!-- Instrucción Inicial -->
+        <div id="initial-instruction"></div>
 
         <!-- Párpados -->
         <div id="eyelids-container" class="eyes-closed">
@@ -226,6 +262,7 @@
             const questionDisplay = document.getElementById('question-display');
             const sceneContainer = document.getElementById('scene-container');
             const orientationWarning = document.getElementById('orientation-warning');
+            const initialInstruction = document.getElementById('initial-instruction');
 
             const menuItems = [
                 "EspiritualMente", "FísicaMente", "IntelectualMente",
@@ -239,6 +276,7 @@
             let questionTimeout;
             let menuTimeout;
             let blurTimeout;
+            let isFirstRun = true;
 
             // --- Funciones de la animación ---
 
@@ -255,6 +293,10 @@
                 hideMenu();
                 if (optionText) {
                     showQuestion(optionText);
+                }
+                
+                if (isFirstRun) {
+                    showInitialInstruction();
                 }
             };
 
@@ -296,6 +338,18 @@
                 }, 4000);
             };
 
+            const showInitialInstruction = () => {
+                initialInstruction.textContent = "Mantener presionado para ver menú";
+                initialInstruction.classList.add('visible');
+            };
+
+            const hideInitialInstruction = () => {
+                if (isFirstRun) {
+                    initialInstruction.classList.remove('visible');
+                    isFirstRun = false;
+                }
+            };
+
             const changeScene = (newSceneNumber) => {
                 if (newSceneNumber === currentSceneNumber) return;
                 
@@ -307,6 +361,22 @@
                 
                 currentSceneNumber = newSceneNumber;
             };
+            
+            // --- Lógica de Layout del Menú ---
+            const updateRadialMenuLayout = () => {
+                const isMobileLandscape = window.matchMedia("(orientation: landscape) and (max-height: 500px)").matches;
+                const radius = isMobileLandscape ? 120 : 180;
+                const angleStep = (2 * Math.PI) / menuItems.length;
+
+                document.querySelectorAll('.menu-item').forEach((menuItem, index) => {
+                    const angle = index * angleStep - (Math.PI / 2);
+                    const x = radius * Math.cos(angle);
+                    const y = radius * Math.sin(angle);
+                    const transformValue = `translate(-50%, -50%) translate(${x}px, ${y}px)`;
+                    menuItem.style.transform = transformValue;
+                    menuItem.dataset.originalTransform = transformValue;
+                });
+            };
 
             // --- Creación del Menú Radial ---
             const createRadialMenu = () => {
@@ -315,30 +385,21 @@
                 centerItem.textContent = '¿Cómo estás?';
                 radialMenu.appendChild(centerItem);
 
-                const radius = 180;
-                const angleStep = (2 * Math.PI) / menuItems.length;
-
                 menuItems.forEach((itemText, index) => {
-                    const angle = index * angleStep - (Math.PI / 2);
-                    const x = radius * Math.cos(angle);
-                    const y = radius * Math.sin(angle);
-
                     const menuItem = document.createElement('div');
                     menuItem.className = 'menu-item';
                     menuItem.textContent = itemText;
-                    const transformValue = `translate(-50%, -50%) translate(${x}px, ${y}px)`;
-                    menuItem.style.transform = transformValue;
-                    menuItem.dataset.originalTransform = transformValue; // Guardar transform original
                     menuItem.dataset.menuIndex = index;
-
                     radialMenu.appendChild(menuItem);
                 });
+                updateRadialMenuLayout();
             };
 
             // --- Lógica de Eventos Unificada ---
 
             const handleInteractionStart = (e) => {
                 e.preventDefault();
+                hideInitialInstruction();
                 isMouseDown = true;
                 if (menuTimeout) clearTimeout(menuTimeout);
                 closeEyes();
@@ -408,6 +469,8 @@
                     orientationWarning.style.display = 'none';
                     container.classList.remove('hidden');
                 }
+                // Actualizar layout del menú al cambiar la orientación
+                updateRadialMenuLayout();
             };
 
             // --- Inicialización ---
@@ -424,9 +487,8 @@
                 container.addEventListener('touchend', handleInteractionEnd);
                 container.addEventListener('touchmove', handleInteractionMove);
 
-                // Listeners para Orientación
+                // Listeners para Orientación y Redimensión
                 window.addEventListener('resize', checkOrientation);
-                window.addEventListener('orientationchange', checkOrientation);
                 
                 // Comprobación inicial
                 checkOrientation();
