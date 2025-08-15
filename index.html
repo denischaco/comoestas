@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <title>Experiencia Interactiva</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -13,6 +13,7 @@
             font-family: 'Inter', sans-serif;
             overflow: hidden; /* Evita el scroll */
             cursor: pointer;
+            touch-action: none; /* Deshabilita gestos del navegador en móviles */
         }
         /* Contenedor principal que ocupa toda la pantalla */
         #experience-container {
@@ -113,10 +114,6 @@
             filter: blur(1.5px); /* Pequeño blur por defecto */
             transition: filter 0.3s, transform 0.3s;
         }
-        .menu-item:hover {
-            filter: blur(0); /* Quitar blur en hover */
-            transform: translate(-50%, -50%) scale(1.1);
-        }
         /* Estilo para la opción central */
         .menu-item-center {
             position: absolute;
@@ -151,6 +148,40 @@
         #question-display.blurred {
             filter: blur(4px);
         }
+
+        /* Advertencia de orientación */
+        #orientation-warning {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background-color: #000;
+            color: white;
+            display: none; /* Oculto por defecto */
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 100;
+            text-align: center;
+            padding: 20px;
+        }
+        .rotate-icon {
+            width: 50px;
+            height: 80px;
+            border: 4px solid white;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            animation: rotate-animation 1.5s ease-in-out infinite;
+        }
+        @keyframes rotate-animation {
+            0% { transform: rotate(0deg); }
+            50% { transform: rotate(90deg); }
+            100% { transform: rotate(90deg); }
+        }
+        .hidden {
+            display: none !important;
+        }
     </style>
 </head>
 <body class="bg-black">
@@ -181,6 +212,12 @@
         <div id="radial-menu"></div>
     </div>
 
+    <!-- Advertencia de Orientación -->
+    <div id="orientation-warning">
+        <div class="rotate-icon"></div>
+        <p class="text-lg">Por favor, gira tu dispositivo a modo horizontal para continuar.</p>
+    </div>
+
     <script>
         document.addEventListener('DOMContentLoaded', () => {
             const container = document.getElementById('experience-container');
@@ -188,6 +225,7 @@
             const radialMenu = document.getElementById('radial-menu');
             const questionDisplay = document.getElementById('question-display');
             const sceneContainer = document.getElementById('scene-container');
+            const orientationWarning = document.getElementById('orientation-warning');
 
             const menuItems = [
                 "EspiritualMente", "FísicaMente", "IntelectualMente",
@@ -200,13 +238,13 @@
             let currentSceneNumber = 0;
             let questionTimeout;
             let menuTimeout;
-            let blurTimeout; // Timeout para el efecto de blur
+            let blurTimeout;
 
             // --- Funciones de la animación ---
 
             const openEyes = (optionText = null) => {
                 sceneContainer.style.opacity = '1';
-                sceneContainer.classList.remove('blurred'); // Limpiar blur al abrir los ojos
+                sceneContainer.classList.remove('blurred');
                 questionDisplay.classList.remove('blurred');
                 if (blurTimeout) clearTimeout(blurTimeout);
 
@@ -242,21 +280,17 @@
                 if (questionTimeout) clearTimeout(questionTimeout);
                 if (blurTimeout) clearTimeout(blurTimeout);
                 
-                // Aplicar blur al fondo y al texto
                 sceneContainer.classList.add('blurred');
                 questionDisplay.classList.add('blurred');
                 
-                // Mostrar la pregunta
                 questionDisplay.textContent = `¿CÓMO ESTÁS: ${optionText}?`;
                 questionDisplay.classList.add('visible');
 
-                // Quitar el blur después de 2 segundos
                 blurTimeout = setTimeout(() => {
                     sceneContainer.classList.remove('blurred');
                     questionDisplay.classList.remove('blurred');
                 }, 2000);
 
-                // Ocultar la pregunta después de 4 segundos
                 questionTimeout = setTimeout(() => {
                     questionDisplay.classList.remove('visible');
                 }, 4000);
@@ -276,13 +310,11 @@
 
             // --- Creación del Menú Radial ---
             const createRadialMenu = () => {
-                // Crear opción central
                 const centerItem = document.createElement('div');
                 centerItem.className = 'menu-item-center';
                 centerItem.textContent = '¿Cómo estás?';
                 radialMenu.appendChild(centerItem);
 
-                // Crear opciones exteriores
                 const radius = 180;
                 const angleStep = (2 * Math.PI) / menuItems.length;
 
@@ -294,22 +326,18 @@
                     const menuItem = document.createElement('div');
                     menuItem.className = 'menu-item';
                     menuItem.textContent = itemText;
-                    menuItem.style.transform = `translate(-50%, -50%) translate(${x}px, ${y}px)`;
+                    const transformValue = `translate(-50%, -50%) translate(${x}px, ${y}px)`;
+                    menuItem.style.transform = transformValue;
+                    menuItem.dataset.originalTransform = transformValue; // Guardar transform original
                     menuItem.dataset.menuIndex = index;
-
-                    menuItem.addEventListener('mouseenter', () => {
-                        if (isMouseDown) selectedMenuIndex = index;
-                    });
-                    menuItem.addEventListener('mouseleave', () => {
-                        if (isMouseDown) selectedMenuIndex = -1;
-                    });
 
                     radialMenu.appendChild(menuItem);
                 });
             };
 
-            // --- Lógica de Eventos ---
-            container.addEventListener('mousedown', (e) => {
+            // --- Lógica de Eventos Unificada ---
+
+            const handleInteractionStart = (e) => {
                 e.preventDefault();
                 isMouseDown = true;
                 if (menuTimeout) clearTimeout(menuTimeout);
@@ -320,9 +348,9 @@
                         showMenu();
                     }
                 }, 800);
-            });
+            };
 
-            container.addEventListener('mouseup', (e) => {
+            const handleInteractionEnd = (e) => {
                 e.preventDefault();
                 if (!isMouseDown) return;
                 isMouseDown = false;
@@ -334,17 +362,74 @@
                     changeScene(newSceneNumber);
                     selectedText = menuItems[selectedMenuIndex];
                 } else if (menuBecameVisible) {
-                    changeScene(0); // Volver a la escena inicial si no se seleccionó nada
+                    changeScene(0);
                 }
                 
                 openEyes(selectedText);
                 selectedMenuIndex = -1;
-            });
+            };
+            
+            const handleInteractionMove = (e) => {
+                if (!isMouseDown || !menuBecameVisible) return;
+                e.preventDefault();
+
+                const x = e.touches ? e.touches[0].clientX : e.clientX;
+                const y = e.touches ? e.touches[0].clientY : e.clientY;
+
+                const elementUnderPoint = document.elementFromPoint(x, y);
+                let newlySelectedItem = null;
+
+                if (elementUnderPoint && elementUnderPoint.classList.contains('menu-item')) {
+                    newlySelectedItem = elementUnderPoint;
+                }
+
+                document.querySelectorAll('.menu-item').forEach(item => {
+                    if (item === newlySelectedItem) {
+                        item.style.filter = 'blur(0)';
+                        item.style.transform = `${item.dataset.originalTransform} scale(1.1)`;
+                        selectedMenuIndex = parseInt(item.dataset.menuIndex, 10);
+                    } else {
+                        item.style.filter = 'blur(1.5px)';
+                        item.style.transform = item.dataset.originalTransform;
+                    }
+                });
+
+                if (!newlySelectedItem) {
+                    selectedMenuIndex = -1;
+                }
+            };
+
+            // --- Detección de Orientación ---
+            const checkOrientation = () => {
+                if (window.matchMedia("(orientation: portrait)").matches) {
+                    orientationWarning.style.display = 'flex';
+                    container.classList.add('hidden');
+                } else {
+                    orientationWarning.style.display = 'none';
+                    container.classList.remove('hidden');
+                }
+            };
 
             // --- Inicialización ---
             const initializeExperience = () => {
                 createRadialMenu();
                 document.getElementById('scene-0').classList.add('active');
+
+                // Listeners para Mouse
+                container.addEventListener('mousedown', handleInteractionStart);
+                container.addEventListener('mouseup', handleInteractionEnd);
+                container.addEventListener('mousemove', handleInteractionMove);
+                // Listeners para Touch
+                container.addEventListener('touchstart', handleInteractionStart);
+                container.addEventListener('touchend', handleInteractionEnd);
+                container.addEventListener('touchmove', handleInteractionMove);
+
+                // Listeners para Orientación
+                window.addEventListener('resize', checkOrientation);
+                window.addEventListener('orientationchange', checkOrientation);
+                
+                // Comprobación inicial
+                checkOrientation();
 
                 setTimeout(() => {
                     openEyes();
